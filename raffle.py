@@ -320,6 +320,10 @@ def make_commands(bot):
         username, credit_amount = parts[0], int(parts[1])
 
         twitch_id = await get_twitch_user_id(username, bot.twitch)
+        if twitch_id is None:
+            await cmd.reply(f"Could not find Twitch user: {username}")
+            return
+
         await bot.queue_db(
             postgres.update_user_tickets,
             bot.pool,
@@ -356,6 +360,10 @@ def make_commands(bot):
 
     async def my_ticket_command(cmd: ChatCommand):
         twitch_id = await get_twitch_user_id(cmd.user.name, bot.twitch)
+        if twitch_id is None:
+            await cmd.reply("Could not resolve your Twitch account.")
+            return
+
         ticket_amt = await bot.queue_db(
             postgres.get_user_tickets,
             bot.pool,
