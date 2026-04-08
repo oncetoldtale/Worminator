@@ -46,6 +46,7 @@ def get_conn(func):
             return result
         except Exception as error:
             print(f"[DB] Error in '{func.__name__}': {error}")
+            raise
     return wrapper
 
 @get_conn
