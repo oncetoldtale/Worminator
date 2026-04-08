@@ -17,7 +17,7 @@ import asyncpg
 import postgres
 
 load_dotenv()
-SUPERADMIN_ID = os.getenv("TWITCHSUPERADMINID")
+SUPERADMIN_ID = int(os.getenv("TWITCHSUPERADMINID", "0"))
 
 class Raffle:
     def __init__(self, duration=180, ticket_amt=1):
@@ -201,11 +201,15 @@ class Raffle:
 
 raffle: Raffle | None = None
 
+
+def user_is_superadmin(cmd: ChatCommand) -> bool:
+    return int(cmd.user.id) == SUPERADMIN_ID
+
 def make_commands(bot):
 
     async def new_raffle_command(cmd: ChatCommand):
         global raffle
-        if cmd.user.id != SUPERADMIN_ID:
+        if not user_is_superadmin(cmd):
             return
 
         duration = cmd.parameter.strip()
@@ -223,7 +227,7 @@ def make_commands(bot):
         if not raffle or not raffle.open:
             await cmd.reply("There is no raffle open right now!")
             return
-        if cmd.user.id != SUPERADMIN_ID:
+        if not user_is_superadmin(cmd):
             return
 
         seconds = cmd.parameter.strip()
@@ -237,7 +241,7 @@ def make_commands(bot):
         await cmd.reply(f"Raffle extended by {seconds} seconds!")
 
     async def clear_command(cmd: ChatCommand):
-        if cmd.user.id != SUPERADMIN_ID:
+        if not user_is_superadmin(cmd):
             return
         if not raffle:
             await cmd.reply("There is no raffle right now!")
@@ -249,7 +253,7 @@ def make_commands(bot):
 
     async def cancel_command(cmd: ChatCommand):
         global raffle
-        if cmd.user.id != SUPERADMIN_ID:
+        if not user_is_superadmin(cmd):
             return
         if not raffle:
             await cmd.reply("There is no raffle right now!")
@@ -260,7 +264,7 @@ def make_commands(bot):
         await cmd.reply("Raffle has been cancelled.")
 
     async def force_end_command(cmd: ChatCommand):
-        if cmd.user.id != SUPERADMIN_ID:
+        if not user_is_superadmin(cmd):
             return
         if not raffle or not raffle.open:
             await cmd.reply("There is no raffle open right now!")
@@ -273,7 +277,7 @@ def make_commands(bot):
         if not raffle:
             await cmd.reply("There is no raffle right now!")
             return
-        if cmd.user.id != SUPERADMIN_ID:
+        if not user_is_superadmin(cmd):
             return
         print(f"[Command] !redraw called by {cmd.user.name}.")
         await raffle.redraw(cmd.reply)
@@ -283,7 +287,7 @@ def make_commands(bot):
         if not raffle:
             await cmd.reply("There is no raffle right now!")
             return
-        if cmd.user.id != SUPERADMIN_ID:
+        if not user_is_superadmin(cmd):
             return
         print(f"[Command] !resolve called by {cmd.user.name}.")
         await raffle.resolve(cmd.reply)
@@ -304,7 +308,7 @@ def make_commands(bot):
         await raffle.claim(int(cmd.user.id), cmd.user.name, cmd.reply)
 
     async def add_ticket_command(cmd: ChatCommand):
-        if cmd.user.id != SUPERADMIN_ID:
+        if not user_is_superadmin(cmd):
             return
         print(f"[Command] !addticket called by {cmd.user.name}.")
 
@@ -327,7 +331,7 @@ def make_commands(bot):
         await cmd.reply(f"Added {credit_amount} ticket(s) to {username}!")
 
     async def drop_tables_command(cmd: ChatCommand):
-        if cmd.user.id != SUPERADMIN_ID:
+        if not user_is_superadmin(cmd):
             print(f"[CMD] Unauthorized drop_tables attempt by user '{cmd.user.name}' (id={cmd.user.id}).")
             return
         print(f"[CMD] drop_tables called by superadmin '{cmd.user.name}'.")
@@ -339,7 +343,7 @@ def make_commands(bot):
         print(f"[CMD] drop_tables completed and reply sent.")
 
     async def new_tables_command(cmd: ChatCommand):
-        if cmd.user.id != SUPERADMIN_ID:
+        if not user_is_superadmin(cmd):
             print(f"[CMD] Unauthorized new_tables attempt by user '{cmd.user.name}' (id={cmd.user.id}).")
             return
         print(f"[CMD] new_tables called by superadmin '{cmd.user.name}'.")
