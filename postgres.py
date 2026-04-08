@@ -88,6 +88,50 @@ async def set_user_tickets_zero(conn: asyncpg.Connection, users: list[tuple[str,
         WHERE user_id = $1
     """, insert_values)
     print(f"[DB] Ticket reset complete for {len(users)} user(s).")
+
+
+@get_conn
+async def resolve_raffle_tickets(
+    conn: asyncpg.Connection,
+    winner: tuple[int, str],
+    users_to_credit: list[tuple[int, str]],
+    ticket_amt: int
+) -> None:
+    winner_id, winner_name = winner
+    print(
+        f"[DB] Resolving raffle tickets atomically. Winner: {winner_name} ({winner_id}) "
+        f"| Credit users: {len(users_to_credit)} | Credit amount: {ticket_amt}"
+    )
+
+    async with conn.transaction():
+        await conn.execute(
+            """
+            INSERT INTO users (user_id, username, ticket_count)
+            VALUES ($1, $2, 0)
+            ON CONFLICT (user_id)
+            DO UPDATE SET
+                ticket_count = 0,
+                username = EXCLUDED.username
+            """,
+            winner_id,
+            winner_name,
+        )
+
+        if users_to_credit:
+            insert_values = [(twitch_id, username, ticket_amt) for twitch_id, username in users_to_credit]
+            await conn.executemany(
+                """
+                INSERT INTO users (user_id, username, ticket_count)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (user_id)
+                DO UPDATE SET
+                    ticket_count = users.ticket_count + EXCLUDED.ticket_count,
+                    username = EXCLUDED.username
+                """,
+                insert_values
+            )
+
+    print("[DB] Atomic raffle ticket resolution complete.")
     
 @get_conn
 async def debug_create_new_tables(conn: asyncpg.Connection):

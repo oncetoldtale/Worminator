@@ -184,14 +184,9 @@ class Raffle:
         print(f"claimers list: {claimers}")
 
         await self.bot.queue_db(
-            postgres.set_user_tickets_zero,
+            postgres.resolve_raffle_tickets,
             self.pool,
-            [(winner_id, winner_name)]
-        )
-
-        await self.bot.queue_db(
-            postgres.update_user_tickets,
-            self.pool,
+            (winner_id, winner_name),
             losers + claimers + redrawn,
             self.ticket_amt
         )
