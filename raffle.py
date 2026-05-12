@@ -207,7 +207,10 @@ def make_commands(bot):
         global raffle
         if cmd.user.id != SUPERADMIN_ID:
             return
-
+        if raffle or raffle.open:
+            print(f"[Command] !newraffle called by {cmd.user.name} but previous raffle not resolved. Run !resolve before starting new raffle.")
+            await cmd.reply("Please resolve the current raffle first!")
+            return
         duration = cmd.parameter.strip()
         if not duration or not duration.isdigit():
             print(f"[Command] !newraffle called by {cmd.user.name} with invalid duration: '{cmd.parameter}'")
