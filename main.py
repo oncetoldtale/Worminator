@@ -38,11 +38,18 @@ class Worminator:
 
         self.db_queue = asyncio.Queue()
         self.db_worker_task = None
+        self.db_stop_signal = object()
 
     async def db_worker(self):
         print("[DB WORKER] Started.")
         while True:
-            func, args, future = await self.db_queue.get()
+            item = await self.db_queue.get()
+            if item is self.db_stop_signal:
+                self.db_queue.task_done()
+                print("[DB WORKER] Stop signal received. Exiting.")
+                break
+
+            func, args, future = item
             try:
                 print(f"[DB WORKER] Running {func.__name__}")
                 result = await func(*args)
@@ -57,6 +64,16 @@ class Worminator:
         future = asyncio.get_event_loop().create_future()
         await self.db_queue.put((func, args, future))
         return await future
+
+    async def stop(self):
+        if self.db_worker_task:
+            await self.db_queue.put(self.db_stop_signal)
+            await self.db_worker_task
+            self.db_worker_task = None
+
+        if self.pool:
+            await self.pool.close()
+            self.pool = None
 
     async def on_ready(self, ready_event: EventData):
         await ready_event.chat.join_room(TARGET_CHANNEL)
@@ -88,6 +105,7 @@ class Worminator:
             input("Worminator is online. Press ENTER to stop...\n")
         finally:
             self.chat.stop()
+            await self.stop()
             await self.twitch.close()
 
 
