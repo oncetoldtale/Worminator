@@ -11,6 +11,7 @@ def install_dependency_stubs():
     twitch_module = types.ModuleType("twitchAPI.twitch")
     dotenv_module = types.ModuleType("dotenv")
     asyncpg_module = types.ModuleType("asyncpg")
+    obsws_python_module = types.ModuleType("obsws_python")
 
     class Dummy:
         pass
@@ -44,6 +45,7 @@ def install_dependency_stubs():
     sys.modules.setdefault("twitchAPI.twitch", twitch_module)
     sys.modules.setdefault("dotenv", dotenv_module)
     sys.modules.setdefault("asyncpg", asyncpg_module)
+    sys.modules.setdefault("obsws_python", obsws_python_module)
 
 
 def install_test_environment():

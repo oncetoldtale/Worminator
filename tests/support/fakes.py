@@ -23,3 +23,11 @@ class FakeCommand:
 
     async def reply(self, message):
         self.replies.append(message)
+
+
+class FakeCloseablePool:
+    def __init__(self):
+        self.closed = False
+
+    async def close(self):
+        self.closed = True
