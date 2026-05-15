@@ -1,13 +1,21 @@
 import asyncio
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from tests.support.dependency_stubs import install_test_environment
-from tests.support.fakes import FakeCloseablePool, FakeReadyEvent, FakeTask
+from tests.support.fakes import (
+    FakeChatClient,
+    FakeCloseablePool,
+    FakeReadyEvent,
+    FakeTask,
+    FakeTwitchClient,
+    FakeUserAuthenticator,
+)
 
 
 install_test_environment()
 
+import main as main_module
 from main import Worminator
 
 
@@ -20,6 +28,32 @@ async def failing_operation():
 
 
 class WorminatorTests(unittest.IsolatedAsyncioTestCase):
+    async def test_Start_WhenInputStopsBot_ShouldAuthenticateRegisterCommandsAndCleanup(self):
+        bot = Worminator()
+        twitch = FakeTwitchClient()
+        chat = FakeChatClient()
+        command_handler = Mock()
+        authenticator = FakeUserAuthenticator(twitch, ["scope"])
+
+        with patch("main.Twitch", new=AsyncMock(return_value=twitch)) as twitch_factory, \
+             patch("main.UserAuthenticator", return_value=authenticator) as authenticator_factory, \
+             patch("main.Chat", new=AsyncMock(return_value=chat)) as chat_factory, \
+             patch("main.raffle.make_commands", return_value={"enter": command_handler}) as make_commands, \
+             patch("builtins.input", return_value=""):
+            await bot.start()
+
+        twitch_factory.assert_awaited_once()
+        authenticator_factory.assert_called_once_with(twitch, main_module.USER_SCOPE)
+        chat_factory.assert_awaited_once_with(twitch)
+        make_commands.assert_called_once_with(bot)
+        self.assertTrue(authenticator.authenticate_called)
+        self.assertEqual(twitch.authentications, [("token", main_module.USER_SCOPE, "refresh-token")])
+        self.assertEqual(chat.events, [(main_module.ChatEvent.READY, bot.on_ready)])
+        self.assertEqual(chat.commands, {"enter": command_handler})
+        self.assertTrue(chat.started)
+        self.assertTrue(chat.stopped)
+        self.assertTrue(twitch.closed)
+
     async def test_OnReady_WhenPoolAndWorkerMissing_ShouldJoinChannelCreatePoolAndStartWorker(self):
         bot = Worminator()
         ready_event = FakeReadyEvent()

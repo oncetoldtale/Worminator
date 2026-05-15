@@ -92,3 +92,46 @@ class FakeTwitch:
     def get_users(self, logins):
         self.requested_logins.append(logins)
         return FakeTwitchUsers(self.users)
+
+
+class FakeTwitchClient:
+    def __init__(self):
+        self.authentications = []
+        self.closed = False
+
+    async def set_user_authentication(self, token, scopes, refresh_token):
+        self.authentications.append((token, scopes, refresh_token))
+
+    async def close(self):
+        self.closed = True
+
+
+class FakeUserAuthenticator:
+    def __init__(self, twitch, scopes):
+        self.twitch = twitch
+        self.scopes = scopes
+        self.authenticate_called = False
+
+    async def authenticate(self):
+        self.authenticate_called = True
+        return "token", "refresh-token"
+
+
+class FakeChatClient:
+    def __init__(self):
+        self.events = []
+        self.commands = {}
+        self.started = False
+        self.stopped = False
+
+    def register_event(self, event, handler):
+        self.events.append((event, handler))
+
+    def register_command(self, name, handler):
+        self.commands[name] = handler
+
+    def start(self):
+        self.started = True
+
+    def stop(self):
+        self.stopped = True
