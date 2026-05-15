@@ -40,3 +40,34 @@ class MessageRecorder:
 
     async def __call__(self, message):
         self.messages.append(message)
+
+
+class FakeTwitchUser:
+    def __init__(self, user_id):
+        self.id = str(user_id)
+
+
+class FakeTwitchUsers:
+    def __init__(self, users):
+        self.users = users
+        self.index = 0
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self.index >= len(self.users):
+            raise StopAsyncIteration
+        user = self.users[self.index]
+        self.index += 1
+        return user
+
+
+class FakeTwitch:
+    def __init__(self, users):
+        self.users = users
+        self.requested_logins = []
+
+    def get_users(self, logins):
+        self.requested_logins.append(logins)
+        return FakeTwitchUsers(self.users)

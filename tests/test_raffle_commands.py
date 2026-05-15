@@ -72,3 +72,33 @@ class RaffleCommandTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(command.replies, ["Could not resolve your Twitch account."])
         self.assertEqual(bot.db_calls, [])
+
+    async def test_NewRaffleCommand_WhenUserIsNotSuperadmin_ShouldNotCreateRaffle(self):
+        bot = FakeBot()
+        command = FakeCommand(user_id=999, name="viewer", parameter="10")
+        commands = raffle_module.make_commands(bot)
+
+        await commands["newraffle"](command)
+
+        self.assertEqual(command.replies, [])
+        self.assertIsNone(raffle_module.raffle)
+
+    async def test_AddTicketCommand_WhenUserIsNotSuperadmin_ShouldNotUpdateDatabase(self):
+        bot = FakeBot()
+        command = FakeCommand(user_id=999, name="viewer", parameter="alice 5")
+        commands = raffle_module.make_commands(bot)
+
+        await commands["addticket"](command)
+
+        self.assertEqual(command.replies, [])
+        self.assertEqual(bot.db_calls, [])
+
+    async def test_DebugDropTablesCommand_WhenUserIsNotSuperadmin_ShouldNotDropTables(self):
+        bot = FakeBot()
+        command = FakeCommand(user_id=999, name="viewer")
+        commands = raffle_module.make_commands(bot)
+
+        await commands["debugdroptables"](command)
+
+        self.assertEqual(command.replies, [])
+        self.assertEqual(bot.db_calls, [])
