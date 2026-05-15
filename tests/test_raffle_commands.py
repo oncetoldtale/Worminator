@@ -62,6 +62,16 @@ class RaffleCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(command.replies, ["Could not find Twitch user: missing_user"])
         self.assertEqual(bot.db_calls, [])
 
+    async def test_AddTicketCommand_WhenInputInvalid_ShouldReplyWithUsage(self):
+        bot = FakeBot()
+        command = FakeCommand(parameter="alice")
+        commands = raffle_module.make_commands(bot)
+
+        await commands["addticket"](command)
+
+        self.assertEqual(command.replies, ["Usage: !addticket USERNAME ticket_amt"])
+        self.assertEqual(bot.db_calls, [])
+
     async def test_MyTicketsCommand_WhenTwitchUserUnresolved_ShouldNotReadDatabase(self):
         bot = FakeBot()
         command = FakeCommand(user_id=7, name="viewer")
@@ -188,6 +198,20 @@ class RaffleCommandTests(unittest.IsolatedAsyncioTestCase):
         await commands["extend"](command)
 
         self.assertEqual(command.replies, ["There is no raffle open right now!"])
+
+    async def test_ExtendCommand_WhenInputInvalid_ShouldRejectInput(self):
+        bot = FakeBot()
+        command = FakeCommand(parameter="abc")
+        active_raffle = Raffle()
+        active_raffle.open = True
+        active_raffle.extend = Mock()
+        raffle_module.raffle = active_raffle
+        commands = raffle_module.make_commands(bot)
+
+        await commands["extend"](command)
+
+        active_raffle.extend.assert_not_called()
+        self.assertEqual(command.replies, ["Please input a valid duration (int)."])
 
     async def test_ClearCommand_WhenRaffleExists_ShouldClearEntriesAndClaims(self):
         bot = FakeBot()
