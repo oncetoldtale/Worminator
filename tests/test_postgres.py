@@ -39,6 +39,34 @@ class PostgresTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(tickets, 0)
 
+    async def test_UpdateUserTickets_WhenUsersProvided_ShouldUpsertTicketCredits(self):
+        connection = FakeConnection()
+
+        await postgres.update_user_tickets(
+            FakePool(connection),
+            [(1, "alice"), (2, "bob")],
+            5,
+        )
+
+        self.assertEqual(len(connection.executemany_calls), 1)
+        query, values = connection.executemany_calls[0]
+        self.assertIn("ON CONFLICT (user_id)", query)
+        self.assertIn("ticket_count = users.ticket_count + EXCLUDED.ticket_count", query)
+        self.assertEqual(values, [(1, "alice", 5), (2, "bob", 5)])
+
+    async def test_SetUserTicketsZero_WhenUsersProvided_ShouldResetExistingTickets(self):
+        connection = FakeConnection()
+
+        await postgres.set_user_tickets_zero(
+            FakePool(connection),
+            [(1, "alice"), (2, "bob")],
+        )
+
+        self.assertEqual(len(connection.executemany_calls), 1)
+        query, values = connection.executemany_calls[0]
+        self.assertIn("SET ticket_count = 0", query)
+        self.assertEqual(values, [(1, "alice"), (2, "bob")])
+
     async def test_ResolveRaffleTickets_WhenWinnerAndUsersToCredit_ShouldExecuteInSingleTransaction(self):
         connection = FakeConnection()
 
@@ -74,3 +102,23 @@ class PostgresTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(connection.executemany_calls), 1)
         _, values = connection.executemany_calls[0]
         self.assertEqual(values, [(2, "bob", 3)])
+
+    async def test_DebugCreateNewTables_WhenCalled_ShouldExecuteUsersTableDdl(self):
+        connection = FakeConnection()
+
+        await postgres.debug_create_new_tables(FakePool(connection))
+
+        self.assertEqual(len(connection.operations), 1)
+        operation, query, args = connection.operations[0]
+        self.assertEqual(operation, "execute")
+        self.assertEqual(args, ())
+        self.assertIn("DROP TABLE IF EXISTS users", query)
+        self.assertIn("CREATE TABLE users", query)
+        self.assertIn("times_coached", query)
+
+    async def test_DebugDropAllTables_WhenCalled_ShouldDropUsersTable(self):
+        connection = FakeConnection()
+
+        await postgres.debug_drop_all_tables(FakePool(connection))
+
+        self.assertEqual(connection.operations, [("execute", "DROP TABLE IF EXISTS users;", ())])
