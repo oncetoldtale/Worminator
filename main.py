@@ -113,4 +113,5 @@ def main():
     bot = Worminator()
     asyncio.run(bot.start())
 
-main()
+if __name__ == "__main__":
+    main()
