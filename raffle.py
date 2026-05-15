@@ -154,7 +154,7 @@ class Raffle:
             self.task.cancel()
         self.duration = additional_seconds
         print(f"[Raffle] Raffle extended. New duration: {additional_seconds}s")
-        self.task = asyncio.create_task(self._run_timer(self.send_message))
+        self.task = asyncio.create_task(self._run_timer(self.send_message, self.pool))
 
     async def load_tickets(self, pool: asyncpg.Pool):
         self.tickets = await postgres.get_all_tickets(pool) or {}

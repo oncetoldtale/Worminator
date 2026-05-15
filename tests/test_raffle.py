@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from tests.support.dependency_stubs import install_test_environment
-from tests.support.fakes import FakeBot, MessageRecorder
+from tests.support.fakes import FakeBot, FakeTask, MessageRecorder
 
 
 install_test_environment()
@@ -12,6 +12,41 @@ from raffle import Raffle
 
 
 class RaffleTests(unittest.IsolatedAsyncioTestCase):
+    def test_Cancel_WhenRaffleHasRunningTask_ShouldCloseRaffleAndCancelTask(self):
+        raffle = Raffle()
+        task = FakeTask()
+        raffle.open = True
+        raffle.task = task
+
+        raffle.cancel()
+
+        self.assertFalse(raffle.open)
+        self.assertTrue(task.cancelled)
+
+    def test_Extend_WhenRaffleHasRunningTask_ShouldCancelCurrentTimerAndStartNewTimerWithPool(self):
+        raffle = Raffle(duration=10)
+        current_task = FakeTask()
+        new_task = FakeTask()
+        messages = MessageRecorder()
+        pool = object()
+        timer_calls = []
+        raffle.task = current_task
+        raffle.send_message = messages
+        raffle.pool = pool
+
+        def fake_timer(send_message, timer_pool):
+            timer_calls.append((send_message, timer_pool))
+            return object()
+
+        with patch.object(raffle, "_run_timer", new=fake_timer), \
+             patch("raffle.asyncio.create_task", return_value=new_task):
+            raffle.extend(30)
+
+        self.assertTrue(current_task.cancelled)
+        self.assertEqual(raffle.duration, 30)
+        self.assertEqual(timer_calls, [(messages, pool)])
+        self.assertIs(raffle.task, new_task)
+
     async def test_Enter_WhenNoRaffleOpen_ShouldNotifyUser(self):
         raffle = Raffle()
         raffle.bot = FakeBot()
