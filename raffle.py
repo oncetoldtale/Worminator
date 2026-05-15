@@ -56,7 +56,7 @@ class Raffle:
         await send_message(f"New Coaching raffle has been opened for {self.duration} seconds. !enter in Twitch Chat to enter. !claim to claim a ticket.")
         self.task = asyncio.create_task(self._run_timer(send_message, pool))
 
-    async def close(self, send_message):
+    async def close(self, send_message, pool: asyncpg.Pool):
         if not self.open:
             return
         self.open = False
@@ -66,7 +66,7 @@ class Raffle:
             await send_message("No entries. Raffle closed.")
             return
 
-        winner_id, winner_name = await self.draw()
+        winner_id, winner_name = await self.draw(pool)
         self.current_winner = (winner_id, winner_name)
         print(f"[Raffle] Winner drawn: {winner_name} (ID: {winner_id})")
         await send_message(f"Congratulations {winner_name}, you have been selected for coaching! Use !resolve to confirm or !redraw to pick again.")
@@ -122,7 +122,7 @@ class Raffle:
 
         return random.choices(entries, weights=weights, k=1)[0]
     
-    async def redraw(self, send_message, pool: asyncpg.pool):
+    async def redraw(self, send_message, pool: asyncpg.Pool):
         if not self.current_winner:
             print("[Raffle] Redraw attempted but there is no current winner.")
             await send_message("No active winner to redraw.")
@@ -130,11 +130,15 @@ class Raffle:
 
         prev_winner_id, prev_winner_name = self.current_winner
         self.users["Redrawn"][prev_winner_id] = prev_winner_name
-        del self.users["Entries"][prev_winner_id]
+        self.users["Entries"].pop(prev_winner_id, None)
 
-        await self.load_tickets(pool)
+        if not self.users["Entries"]:
+            self.current_winner = None
+            print("[Raffle] Redraw attempted but there is no eligible entries remaining. Resolve recommended.")
+            await send_message("No eligible entries remaining to redraw from.")
+            return
 
-        winner_id, winner_name = await self.draw()
+        winner_id, winner_name = await self.draw(pool)
         self.current_winner = (winner_id, winner_name)
         print(f"[Raffle] Redrawn. New winner: {winner_name} (ID: {winner_id})")
         await send_message(f"Redrawn! New winner is {winner_name}. Use !resolve to confirm or !redraw to pick again.")
@@ -158,8 +162,24 @@ class Raffle:
  
     async def resolve(self, send_message):
         if not self.current_winner:
-            print("[Raffle] Resolve attempted but there is no current winner.")
-            await send_message("No active winner to resolve.")
+            everyone = (
+                list(self.users["Entries"].items()) +
+                list(self.users["Claims"].items()) +
+                list(self.users["Redrawn"].items())
+            )
+            if not everyone:
+                await send_message("No active winner and no entries. No tickets issued.")
+                return
+            
+            print(f"[Raffle] No winner. Awarding tickets to all {len(everyone)} participants.")
+            await self.bot.queue_db(
+                postgres.resolve_raffle_tickets,
+                self.pool,
+                None,
+                everyone,
+                self.ticket_amt
+            )
+            await send_message("No winner, tickets awarded to all participants.")
             return
 
         winner_id, winner_name = self.current_winner
@@ -207,10 +227,9 @@ def make_commands(bot):
         if not user_is_superadmin(cmd):
             return
         if raffle:
-            if raffle.open:
-                print(f"[Command] !newraffle called by {cmd.user.name} but previous raffle not resolved. Run !resolve before starting new raffle.")
-                await cmd.reply("Please resolve the current raffle first!")
-                return
+            print(f"[Command] !newraffle called by {cmd.user.name} but previous raffle not resolved. Run !resolve before starting new raffle.")
+            await cmd.reply("Please resolve the current raffle first!")
+            return
         duration = cmd.parameter.strip()
         if not duration or not duration.isdigit():
             print(f"[Command] !newraffle called by {cmd.user.name} with invalid duration: '{cmd.parameter}'")
@@ -270,7 +289,7 @@ def make_commands(bot):
             return
         print(f"[Command] !forceend called by {cmd.user.name}. Force ending raffle and drawing winner.")
         raffle.task.cancel()
-        await raffle.close(cmd.reply)
+        await raffle.close(cmd.reply, bot.pool)
 
     async def redraw_command(cmd: ChatCommand):
         if not raffle:
