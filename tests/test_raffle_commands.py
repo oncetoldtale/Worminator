@@ -180,6 +180,15 @@ class RaffleCommandTests(unittest.IsolatedAsyncioTestCase):
         active_raffle.extend.assert_called_once_with(30)
         self.assertEqual(command.replies, ["Raffle extended by 30 seconds!"])
 
+    async def test_ExtendCommand_WhenNoRaffleOpen_ShouldNotifyUser(self):
+        bot = FakeBot()
+        command = FakeCommand(parameter="30")
+        commands = raffle_module.make_commands(bot)
+
+        await commands["extend"](command)
+
+        self.assertEqual(command.replies, ["There is no raffle open right now!"])
+
     async def test_ClearCommand_WhenRaffleExists_ShouldClearEntriesAndClaims(self):
         bot = FakeBot()
         command = FakeCommand()
@@ -194,6 +203,15 @@ class RaffleCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(active_raffle.users["Entries"], {})
         self.assertEqual(active_raffle.users["Claims"], {})
         self.assertEqual(command.replies, ["Raffle entries and claims have been cleared."])
+
+    async def test_ClearCommand_WhenNoRaffleExists_ShouldNotifyUser(self):
+        bot = FakeBot()
+        command = FakeCommand()
+        commands = raffle_module.make_commands(bot)
+
+        await commands["clear"](command)
+
+        self.assertEqual(command.replies, ["There is no raffle right now!"])
 
     async def test_ForceEndCommand_WhenRaffleOpen_ShouldCancelTimerAndCloseRaffle(self):
         bot = FakeBot()
@@ -211,6 +229,15 @@ class RaffleCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(task.cancelled)
         active_raffle.close.assert_awaited_once_with(command.reply, bot.pool)
 
+    async def test_ForceEndCommand_WhenNoRaffleOpen_ShouldNotifyUser(self):
+        bot = FakeBot()
+        command = FakeCommand()
+        commands = raffle_module.make_commands(bot)
+
+        await commands["forceend"](command)
+
+        self.assertEqual(command.replies, ["There is no raffle open right now!"])
+
     async def test_RedrawCommand_WhenRaffleExists_ShouldRedrawWithPool(self):
         bot = FakeBot()
         command = FakeCommand()
@@ -222,6 +249,15 @@ class RaffleCommandTests(unittest.IsolatedAsyncioTestCase):
         await commands["redraw"](command)
 
         active_raffle.redraw.assert_awaited_once_with(command.reply, bot.pool)
+
+    async def test_RedrawCommand_WhenNoRaffleExists_ShouldNotifyUser(self):
+        bot = FakeBot()
+        command = FakeCommand()
+        commands = raffle_module.make_commands(bot)
+
+        await commands["redraw"](command)
+
+        self.assertEqual(command.replies, ["There is no raffle right now!"])
 
     async def test_ResolveCommand_WhenRaffleExists_ShouldResolveAndClearRaffle(self):
         bot = FakeBot()
@@ -236,6 +272,27 @@ class RaffleCommandTests(unittest.IsolatedAsyncioTestCase):
         active_raffle.resolve.assert_awaited_once_with(command.reply)
         self.assertIsNone(raffle_module.raffle)
         self.assertEqual(command.replies, ["The current raffle has been resolved!"])
+
+    async def test_ResolveCommand_WhenNoRaffleExists_ShouldNotifyUser(self):
+        bot = FakeBot()
+        command = FakeCommand()
+        commands = raffle_module.make_commands(bot)
+
+        await commands["resolve"](command)
+
+        self.assertEqual(command.replies, ["There is no raffle right now!"])
+
+    async def test_DebugDropTablesCommand_WhenUserIsSuperadmin_ShouldDropTables(self):
+        bot = FakeBot()
+        command = FakeCommand()
+        commands = raffle_module.make_commands(bot)
+
+        await commands["debugdroptables"](command)
+
+        self.assertEqual(command.replies, ["All tables dropped."])
+        func, args = bot.db_calls[0]
+        self.assertIs(func, raffle_module.postgres.debug_drop_all_tables)
+        self.assertEqual(args, (bot.pool,))
 
     async def test_DebugNewTablesCommand_WhenUserIsSuperadmin_ShouldCreateTables(self):
         bot = FakeBot()
