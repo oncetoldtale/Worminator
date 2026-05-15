@@ -36,12 +36,12 @@ class Raffle:
         self.bot = None
         self.redrawn = []
 
-    async def _run_timer(self, send_message):
+    async def _run_timer(self, send_message, pool):
         for remaining in range(self.duration, 0, -1):
             print(f"\rRaffle closing in: {remaining}s  ", end="", flush=True)
             await asyncio.sleep(1)
         print("\rRaffle timer ended!              ")
-        await self.close(send_message)
+        await self.close(send_message, pool)
 
     async def start(self, send_message, pool: asyncpg.Pool):
         self.pool = pool
@@ -54,7 +54,7 @@ class Raffle:
         self.open = True
         print(f"[Raffle] Raffle started. Duration: {self.duration}s | Ticket award: {self.ticket_amt}")
         await send_message(f"New Coaching raffle has been opened for {self.duration} seconds. !enter in Twitch Chat to enter. !claim to claim a ticket.")
-        self.task = asyncio.create_task(self._run_timer(send_message))
+        self.task = asyncio.create_task(self._run_timer(send_message, pool))
 
     async def close(self, send_message):
         if not self.open:
@@ -114,15 +114,15 @@ class Raffle:
         print(f"[Raffle] {username} claimed a ticket. Total claimers: {len(self.users['Claims'])}")
         await send_message(f"{username}, you have claimed a ticket!")
 
-    async def draw(self) -> tuple[int, str]:
-        await self.load_tickets(self.pool)
+    async def draw(self, pool: asyncpg.pool) -> tuple[int, str]:
+        await self.load_tickets(pool)
 
         entries = list(self.users["Entries"].items())
         weights = [self.tickets.get(user_id, 1) for user_id, _ in entries]
 
         return random.choices(entries, weights=weights, k=1)[0]
     
-    async def redraw(self, send_message):
+    async def redraw(self, send_message, pool: asyncpg.pool):
         if not self.current_winner:
             print("[Raffle] Redraw attempted but there is no current winner.")
             await send_message("No active winner to redraw.")
@@ -132,7 +132,7 @@ class Raffle:
         self.users["Redrawn"][prev_winner_id] = prev_winner_name
         del self.users["Entries"][prev_winner_id]
 
-        await self.load_tickets(self.pool)
+        await self.load_tickets(pool)
 
         winner_id, winner_name = await self.draw()
         self.current_winner = (winner_id, winner_name)
