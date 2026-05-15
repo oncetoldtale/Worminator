@@ -102,3 +102,66 @@ class RaffleCommandTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(command.replies, [])
         self.assertEqual(bot.db_calls, [])
+
+    async def test_EnterCommand_WhenNoRaffleOpen_ShouldNotifyUser(self):
+        bot = FakeBot()
+        command = FakeCommand(user_id=7, name="viewer")
+        commands = raffle_module.make_commands(bot)
+
+        await commands["enter"](command)
+
+        self.assertEqual(command.replies, ["There is no raffle open right now!"])
+
+    async def test_ClaimCommand_WhenNoRaffleOpen_ShouldNotifyUser(self):
+        bot = FakeBot()
+        command = FakeCommand(user_id=7, name="viewer")
+        commands = raffle_module.make_commands(bot)
+
+        await commands["claim"](command)
+
+        self.assertEqual(command.replies, ["There is no raffle open right now!"])
+
+    async def test_CancelCommand_WhenRaffleExists_ShouldCancelAndClearRaffle(self):
+        bot = FakeBot()
+        command = FakeCommand()
+        active_raffle = Raffle()
+        raffle_module.raffle = active_raffle
+        commands = raffle_module.make_commands(bot)
+
+        await commands["cancel"](command)
+
+        self.assertIsNone(raffle_module.raffle)
+        self.assertFalse(active_raffle.open)
+        self.assertEqual(command.replies, ["Raffle has been cancelled."])
+
+    async def test_AddTicketCommand_WhenTwitchUserResolved_ShouldUpdateDatabase(self):
+        bot = FakeBot()
+        command = FakeCommand(parameter="alice 5")
+        commands = raffle_module.make_commands(bot)
+
+        with patch("raffle.get_twitch_user_id", new=AsyncMock(return_value=77)):
+            await commands["addticket"](command)
+
+        self.assertEqual(command.replies, ["Added 5 ticket(s) to alice!"])
+        self.assertEqual(len(bot.db_calls), 1)
+        func, args = bot.db_calls[0]
+        self.assertIs(func, raffle_module.postgres.update_user_tickets)
+        self.assertEqual(args, (bot.pool, [(77, "alice")], 5))
+
+    async def test_MyTicketsCommand_WhenTwitchUserResolved_ShouldReadDatabase(self):
+        bot = FakeBot()
+        command = FakeCommand(user_id=7, name="viewer")
+        commands = raffle_module.make_commands(bot)
+
+        async def queue_db(func, *args):
+            bot.db_calls.append((func, args))
+            return 4
+
+        bot.queue_db = queue_db
+        with patch("raffle.get_twitch_user_id", new=AsyncMock(return_value=7)):
+            await commands["mytickets"](command)
+
+        self.assertEqual(command.replies, ["viewer, you have 4 ticket(s)."])
+        func, args = bot.db_calls[0]
+        self.assertIs(func, raffle_module.postgres.get_user_tickets)
+        self.assertEqual(args, (bot.pool, 7))
