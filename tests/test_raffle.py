@@ -47,6 +47,77 @@ class RaffleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(timer_calls, [(messages, pool)])
         self.assertIs(raffle.task, new_task)
 
+    async def test_Start_WhenRaffleClosed_ShouldOpenRaffleAndStartTimer(self):
+        raffle = Raffle(duration=10)
+        new_task = FakeTask()
+        messages = MessageRecorder()
+        pool = object()
+        timer_calls = []
+
+        def fake_timer(send_message, timer_pool):
+            timer_calls.append((send_message, timer_pool))
+            return object()
+
+        with patch.object(raffle, "_run_timer", new=fake_timer), \
+             patch("raffle.asyncio.create_task", return_value=new_task):
+            await raffle.start(messages, pool)
+
+        self.assertTrue(raffle.open)
+        self.assertIs(raffle.pool, pool)
+        self.assertIs(raffle.send_message, messages)
+        self.assertEqual(timer_calls, [(messages, pool)])
+        self.assertIs(raffle.task, new_task)
+        self.assertEqual(
+            messages.messages,
+            ["New Coaching raffle has been opened for 10 seconds. !enter in Twitch Chat to enter. !claim to claim a ticket."],
+        )
+
+    async def test_Start_WhenRaffleAlreadyOpen_ShouldNotifyUserAndNotStartNewTimer(self):
+        raffle = Raffle()
+        raffle.open = True
+        messages = MessageRecorder()
+
+        with patch("raffle.asyncio.create_task") as create_task:
+            await raffle.start(messages, object())
+
+        create_task.assert_not_called()
+        self.assertEqual(messages.messages, ["Raffle already running!"])
+
+    async def test_Close_WhenEntriesExist_ShouldDrawWinnerAndNotifyUser(self):
+        raffle = Raffle()
+        raffle.open = True
+        raffle.users["Entries"] = {1: "alice"}
+        messages = MessageRecorder()
+        pool = object()
+
+        with patch.object(raffle, "draw", new=AsyncMock(return_value=(1, "alice"))):
+            await raffle.close(messages, pool)
+
+        self.assertFalse(raffle.open)
+        self.assertEqual(raffle.current_winner, (1, "alice"))
+        self.assertEqual(
+            messages.messages,
+            ["Congratulations alice, you have been selected for coaching! Use !resolve to confirm or !redraw to pick again."],
+        )
+
+    async def test_Redraw_WhenEligibleEntriesRemain_ShouldDrawNewWinnerAndNotifyUser(self):
+        raffle = Raffle()
+        raffle.current_winner = (1, "alice")
+        raffle.users["Entries"] = {1: "alice", 2: "bob"}
+        messages = MessageRecorder()
+        pool = object()
+
+        with patch.object(raffle, "draw", new=AsyncMock(return_value=(2, "bob"))):
+            await raffle.redraw(messages, pool)
+
+        self.assertEqual(raffle.current_winner, (2, "bob"))
+        self.assertEqual(raffle.users["Entries"], {2: "bob"})
+        self.assertEqual(raffle.users["Redrawn"], {1: "alice"})
+        self.assertEqual(
+            messages.messages,
+            ["Redrawn! New winner is bob. Use !resolve to confirm or !redraw to pick again."],
+        )
+
     async def test_Enter_WhenNoRaffleOpen_ShouldNotifyUser(self):
         raffle = Raffle()
         raffle.bot = FakeBot()
