@@ -352,30 +352,6 @@ def make_commands(bot):
         print(f"[Command] !addticket called by {cmd.user.name}. Crediting {credit_amount} tickets to {username}.")
         await cmd.reply(f"Added {credit_amount} ticket(s) to {username}!")
 
-    async def drop_tables_command(cmd: ChatCommand):
-        if not user_is_superadmin(cmd):
-            print(f"[CMD] Unauthorized drop_tables attempt by user '{cmd.user.name}' (id={cmd.user.id}).")
-            return
-        print(f"[CMD] drop_tables called by superadmin '{cmd.user.name}'.")
-        await bot.queue_db(
-            postgres.debug_drop_all_tables,
-            bot.pool,
-        )
-        await cmd.reply("All tables dropped.")
-        print(f"[CMD] drop_tables completed and reply sent.")
-
-    async def new_tables_command(cmd: ChatCommand):
-        if not user_is_superadmin(cmd):
-            print(f"[CMD] Unauthorized new_tables attempt by user '{cmd.user.name}' (id={cmd.user.id}).")
-            return
-        print(f"[CMD] new_tables called by superadmin '{cmd.user.name}'.")
-        await bot.queue_db(
-            postgres.debug_create_new_tables,
-            bot.pool,
-        )
-        await cmd.reply("Tables created.")
-        print(f"[CMD] new_tables completed and reply sent.")
-
     async def my_ticket_command(cmd: ChatCommand):
         twitch_id = await get_twitch_user_id(cmd.user.name, bot.twitch)
         if twitch_id is None:

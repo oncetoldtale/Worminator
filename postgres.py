@@ -126,24 +126,3 @@ async def resolve_raffle_tickets(conn: asyncpg.Connection,
             )
 
     print("[DB] Atomic raffle ticket resolution complete.")
-    
-@get_conn
-async def debug_create_new_tables(conn: asyncpg.Connection):
-    print(f"[DB] Dropping and recreating tables...")
-    new_user_table = """
-    DROP TABLE IF EXISTS users;
-    CREATE TABLE users (
-        user_id         BIGINT PRIMARY KEY,
-        username        VARCHAR(50) NOT NULL,
-        times_coached   INT DEFAULT 0,
-        ticket_count    INT DEFAULT 0
-    );
-    """
-    await conn.execute(new_user_table)
-    print(f"[DB] Tables created successfully.")
-
-@get_conn
-async def debug_drop_all_tables(conn: asyncpg.Connection):
-    print(f"[DB][DEBUG] Dropping all tables...")
-    await conn.execute("DROP TABLE IF EXISTS users;")
-    print(f"[DB][DEBUG] All tables dropped.")
