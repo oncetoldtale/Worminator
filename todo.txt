@@ -1,8 +1,0 @@
-1. rewrite how ids are written in, instead have it populate twitch_id
-2. have raffles log everything into db
-3. have raffles resolve into db
-4. pull ticket amounts by querying db entries.
-5. refactor to no longer work off of old db schema.
-6. remove ticket amount per raffle logic.
-7. add some kinda config for multipliers.
-8. build unit tests for everything.
