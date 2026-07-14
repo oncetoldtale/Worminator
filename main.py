@@ -51,10 +51,10 @@ class Worminator:
                 print("[DB WORKER] Stop signal received. Exiting.")
                 break
 
-            func, args, future = item
+            func, args, kwargs, future = item
             try:
                 print(f"[DB WORKER] Running {func.__name__}")
-                result = await func(*args)
+                result = await func(*args, **kwargs)
                 future.set_result(result)
             except Exception as e:
                 print(f"[DB WORKER ERROR] {func.__name__}: {e}")
@@ -62,9 +62,9 @@ class Worminator:
             finally:
                 self.db_queue.task_done()
 
-    async def queue_db(self, func, *args):
+    async def queue_db(self, func, *args, **kwargs):
         future = asyncio.get_event_loop().create_future()
-        await self.db_queue.put((func, args, future))
+        await self.db_queue.put((func, args, kwargs, future))
         return await future
 
     async def stop(self):

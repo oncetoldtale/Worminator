@@ -26,6 +26,8 @@ class Raffle:
         self.ticket_amt = ticket_amt
         self.open = False
         self.end_timestamp = None
+        self.raffle_id = None
+        self.pool = None
         self.users = {
             "Entries" : {}, #user_id: username
             "Claims" : {}, #user_id: username 
@@ -73,14 +75,19 @@ class Raffle:
             print("[Raffle] Attempted to start a raffle but one is already running.")
             await send_message("Raffle already running!")
             return
+
+        self.raffle_id = await self.bot.queue_db(postgres.create_raffle, pool, self.duration)
+
         self.open = True
         self.end_timestamp = time.time() + self.duration
-        print(f"[Raffle] Raffle started. Duration: {self.duration}s | Ticket award: {self.ticket_amt}")
+        print(f"[Raffle] Raffle started (raffle_id={self.raffle_id}). Duration: {self.duration}s | Ticket award: {self.ticket_amt}")
         await send_message(f"New Coaching raffle has been opened for {self.duration} seconds. !enter in Twitch Chat to enter. !claim to claim a ticket.")
         self.task = asyncio.create_task(self._run_timer(send_message, pool))
         await self.emit_overlay_state()
 
     async def close(self, send_message, pool: asyncpg.Pool):
+        global raffle
+
         if not self.open:
             return
         self.open = False
@@ -88,12 +95,19 @@ class Raffle:
 
         if not self.users["Entries"]:
             print("[Raffle] Raffle closed with no entries.")
+            if self.raffle_id is not None:
+                await self.bot.queue_db(postgres.update_raffle_status, pool, self.raffle_id, "no winner")
             await send_message("No entries. Raffle closed.")
             await self.emit_overlay_state()
+            # Nothing left to resolve, so fully clear the raffle rather than
+            # leaving it dangling and blocking the next !newraffle.
+            raffle = None
             return
 
         winner_id, winner_name = await self.draw(pool)
         self.current_winner = (winner_id, winner_name)
+        if self.raffle_id is not None:
+            await self.bot.queue_db(postgres.update_raffle_status, pool, self.raffle_id, "drawn")
         print(f"[Raffle] Winner drawn: {winner_name} (ID: {winner_id})")
         await send_message(f"Congratulations {winner_name}, you have been selected for coaching! Use !resolve to confirm or !redraw to pick again.")
         await self.emit_overlay_state()
@@ -176,12 +190,14 @@ class Raffle:
         await send_message(f"Redrawn! New winner is {winner_name}. Use !resolve to confirm or !redraw to pick again.")
         await self.emit_overlay_state()
 
-    def cancel(self):
+    async def cancel(self):
         self.open = False
         self.end_timestamp = None
         self.current_winner = None
         if self.task:
             self.task.cancel()
+        if self.raffle_id is not None and self.bot is not None:
+            await self.bot.queue_db(postgres.update_raffle_status, self.pool, self.raffle_id, "cancelled")
         print("[Raffle] Raffle has been cancelled.")
         
     def extend(self, additional_seconds=60):
@@ -197,7 +213,7 @@ class Raffle:
         self.tickets = await postgres.get_all_tickets(pool) or {}
         print(f"[Raffle] Loaded tickets for {len(self.tickets)} users from database.")
  
-    async def resolve(self, send_message):
+    async def resolve(self, send_message, issued_by: int | None = None):
         if not self.current_winner:
             everyone = (
                 list(self.users["Entries"].items()) +
@@ -212,9 +228,12 @@ class Raffle:
             await self.bot.queue_db(
                 postgres.resolve_raffle_tickets,
                 self.pool,
+                self.raffle_id,
                 None,
                 everyone,
-                self.ticket_amt
+                self.ticket_amt,
+                None,
+                issued_by if issued_by is not None else SUPERADMIN_ID,
             )
             await send_message("No winner, tickets awarded to all participants.")
             self.open = False
@@ -246,9 +265,12 @@ class Raffle:
         await self.bot.queue_db(
             postgres.resolve_raffle_tickets,
             self.pool,
+            self.raffle_id,
             (winner_id, winner_name),
             losers + claimers + redrawn,
-            self.ticket_amt
+            self.ticket_amt,
+            None,
+            issued_by if issued_by is not None else SUPERADMIN_ID,
         )
         
         self.bot.winners.append(winner_id)
@@ -325,7 +347,7 @@ def make_commands(bot):
             await cmd.reply("There is no raffle right now!")
             return
         print(f"[Command] !cancel called by {cmd.user.name}.")
-        raffle.cancel()
+        await raffle.cancel()
         await bot.publish_overlay_state(raffle.overlay_state())
         raffle = None
         await cmd.reply("Raffle has been cancelled.")
@@ -357,7 +379,7 @@ def make_commands(bot):
         if not user_is_superadmin(cmd):
             return
         print(f"[Command] !resolve called by {cmd.user.name}.")
-        await raffle.resolve(cmd.reply)
+        await raffle.resolve(cmd.reply, issued_by=int(cmd.user.id))
         await cmd.reply("The current raffle has been resolved!")
         raffle = None
         
@@ -409,7 +431,8 @@ def make_commands(bot):
             postgres.update_user_tickets,
             bot.pool,
             [(twitch_id, username)],
-            credit_amount
+            credit_amount,
+            int(cmd.user.id),
         )
 
         print(f"[Command] !addticket called by {cmd.user.name}. Crediting {credit_amount} tickets to {username}.")
