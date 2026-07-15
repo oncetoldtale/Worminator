@@ -1,6 +1,6 @@
 # Worminator
 
-Worminator is a stream management application for [OnceToldTale](https://twitch.tv/oncetoldtale).
+Worminator is a stream companion application for [OnceToldTale](https://twitch.tv/oncetoldtale).
 
 It handles Twitch integration, raffle management, persistent user data, and a real-time browser overlay system for OBS. It is designed as a modular backend where different platforms and interfaces can interact with shared application features.
 
