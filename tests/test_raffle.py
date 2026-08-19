@@ -1,14 +1,12 @@
 import unittest
 from unittest.mock import AsyncMock, patch
 
+import raffle as raffle_module
+from raffle import Raffle
 from tests.support.dependency_stubs import install_test_environment
 from tests.support.fakes import FakeBot, FakeTask, MessageRecorder
 
-
 install_test_environment()
-
-import raffle as raffle_module
-from raffle import Raffle
 
 
 class RaffleTests(unittest.IsolatedAsyncioTestCase):
@@ -38,8 +36,10 @@ class RaffleTests(unittest.IsolatedAsyncioTestCase):
             timer_calls.append((send_message, timer_pool))
             return object()
 
-        with patch.object(raffle, "_run_timer", new=fake_timer), \
-             patch("raffle.asyncio.create_task", return_value=new_task):
+        with (
+            patch.object(raffle, "_run_timer", new=fake_timer),
+            patch("raffle.asyncio.create_task", return_value=new_task),
+        ):
             raffle.extend(30)
 
         self.assertTrue(current_task.cancelled)
@@ -58,8 +58,10 @@ class RaffleTests(unittest.IsolatedAsyncioTestCase):
             timer_calls.append((send_message, timer_pool))
             return object()
 
-        with patch.object(raffle, "_run_timer", new=fake_timer), \
-             patch("raffle.asyncio.create_task", return_value=new_task):
+        with (
+            patch.object(raffle, "_run_timer", new=fake_timer),
+            patch("raffle.asyncio.create_task", return_value=new_task),
+        ):
             await raffle.start(messages, pool)
 
         self.assertTrue(raffle.open)
@@ -69,7 +71,10 @@ class RaffleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(raffle.task, new_task)
         self.assertEqual(
             messages.messages,
-            ["New Coaching raffle has been opened for 10 seconds. !enter in Twitch Chat to enter. !claim to claim a ticket."],
+            [
+                "New Coaching raffle has been opened for 10 seconds. "
+                "!enter in Twitch Chat to enter. !claim to claim a ticket."
+            ],
         )
 
     async def test_Start_WhenRaffleAlreadyOpen_ShouldNotifyUserAndNotStartNewTimer(self):
@@ -97,7 +102,10 @@ class RaffleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(raffle.current_winner, (1, "alice"))
         self.assertEqual(
             messages.messages,
-            ["Congratulations alice, you have been selected for coaching! Use !resolve to confirm or !redraw to pick again."],
+            [
+                "Congratulations alice, you have been selected for coaching! "
+                "Use !resolve to confirm or !redraw to pick again."
+            ],
         )
 
     async def test_Redraw_WhenEligibleEntriesRemain_ShouldDrawNewWinnerAndNotifyUser(self):
@@ -199,8 +207,10 @@ class RaffleTests(unittest.IsolatedAsyncioTestCase):
         raffle.users["Entries"] = {1: "alice", 2: "bob"}
         pool = object()
 
-        with patch("raffle.postgres.get_all_tickets", new=AsyncMock(return_value={1: 5, 2: 1})), \
-             patch("raffle.random.choices", return_value=[(1, "alice")]) as choices:
+        with (
+            patch("raffle.postgres.get_all_tickets", new=AsyncMock(return_value={1: 5, 2: 1})),
+            patch("raffle.random.choices", return_value=[(1, "alice")]) as choices,
+        ):
             winner = await raffle.draw(pool)
 
         self.assertEqual(winner, (1, "alice"))

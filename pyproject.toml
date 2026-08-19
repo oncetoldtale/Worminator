@@ -1,0 +1,38 @@
+[project]
+name = "worminator"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "aiohttp==3.13.2",
+    "asyncpg==0.31.0",
+    "discord-py==2.6.4",
+    "obsws-python==1.8.0",
+    "python-dotenv==1.2.2",
+    "twitchapi==4.5.0",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.0",
+    "ruff>=0.15.21",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "UP",
+    "B",
+    "SIM",
+]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"

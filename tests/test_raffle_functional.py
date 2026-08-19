@@ -1,14 +1,12 @@
 import unittest
 from unittest.mock import AsyncMock, patch
 
+import raffle as raffle_module
+from raffle import Raffle
 from tests.support.dependency_stubs import install_test_environment
 from tests.support.fakes import FakeBot, MessageRecorder
 
-
 install_test_environment()
-
-import raffle as raffle_module
-from raffle import Raffle
 
 
 class RaffleFunctionalTests(unittest.IsolatedAsyncioTestCase):

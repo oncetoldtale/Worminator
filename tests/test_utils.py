@@ -2,11 +2,9 @@ import unittest
 
 from tests.support.dependency_stubs import install_test_environment
 from tests.support.fakes import FakeTwitch, FakeTwitchUser
-
+from utils import get_twitch_user_id
 
 install_test_environment()
-
-from utils import get_twitch_user_id
 
 
 class UtilsTests(unittest.IsolatedAsyncioTestCase):

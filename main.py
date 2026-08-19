@@ -1,16 +1,13 @@
-from twitchAPI.chat import Chat, EventData, ChatMessage, ChatSub, ChatCommand
-from twitchAPI.type import AuthScope, ChatEvent
-from twitchAPI.oauth import UserAuthenticator
-from twitchAPI.twitch import Twitch
 import asyncio
-
-import time
-import obsws_python as obs
-from dotenv import load_dotenv
 import os
 
+from dotenv import load_dotenv
+from twitchAPI.chat import Chat, EventData
+from twitchAPI.oauth import UserAuthenticator
+from twitchAPI.twitch import Twitch
+from twitchAPI.type import AuthScope, ChatEvent
+
 import raffle
-import postgres
 from overlay_ws import OverlayBroadcaster
 from postgres import create_pool
 
@@ -24,9 +21,8 @@ obs_ip = os.getenv("OBS_IP")
 obs_port = os.getenv("OBS_PORT")
 obs_password = os.getenv("OBS_PASSWORD")
 
-USER_SCOPE = [AuthScope.CHAT_READ,
-              AuthScope.CHAT_EDIT,
-              AuthScope.CHANNEL_MANAGE_BROADCAST]
+USER_SCOPE = [AuthScope.CHAT_READ, AuthScope.CHAT_EDIT, AuthScope.CHANNEL_MANAGE_BROADCAST]
+
 
 class Worminator:
     def __init__(self):
@@ -94,7 +90,7 @@ class Worminator:
             self.db_worker_task = asyncio.create_task(self.db_worker())
 
         print(f"Bot has joined {TARGET_CHANNEL} channel.")
-    
+
     async def start(self):
         self.twitch = await Twitch(APP_ID, APP_SECRET)
         auth = UserAuthenticator(self.twitch, USER_SCOPE)
@@ -122,6 +118,7 @@ class Worminator:
 def main():
     bot = Worminator()
     asyncio.run(bot.start())
+
 
 if __name__ == "__main__":
     main()

@@ -2,6 +2,8 @@ import asyncio
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
+import main as main_module
+from main import Worminator
 from tests.support.dependency_stubs import install_test_environment
 from tests.support.fakes import (
     FakeChatClient,
@@ -12,11 +14,7 @@ from tests.support.fakes import (
     FakeUserAuthenticator,
 )
 
-
 install_test_environment()
-
-import main as main_module
-from main import Worminator
 
 
 async def successful_operation(value):
@@ -35,11 +33,13 @@ class WorminatorTests(unittest.IsolatedAsyncioTestCase):
         command_handler = Mock()
         authenticator = FakeUserAuthenticator(twitch, ["scope"])
 
-        with patch("main.Twitch", new=AsyncMock(return_value=twitch)) as twitch_factory, \
-             patch("main.UserAuthenticator", return_value=authenticator) as authenticator_factory, \
-             patch("main.Chat", new=AsyncMock(return_value=chat)) as chat_factory, \
-             patch("main.raffle.make_commands", return_value={"enter": command_handler}) as make_commands, \
-             patch("builtins.input", return_value=""):
+        with (
+            patch("main.Twitch", new=AsyncMock(return_value=twitch)) as twitch_factory,
+            patch("main.UserAuthenticator", return_value=authenticator) as authenticator_factory,
+            patch("main.Chat", new=AsyncMock(return_value=chat)) as chat_factory,
+            patch("main.raffle.make_commands", return_value={"enter": command_handler}) as make_commands,
+            patch("builtins.input", return_value=""),
+        ):
             await bot.start()
 
         twitch_factory.assert_awaited_once()
@@ -64,9 +64,11 @@ class WorminatorTests(unittest.IsolatedAsyncioTestCase):
             coro.close()
             return task
 
-        with patch("main.TARGET_CHANNEL", "test_channel"), \
-             patch("main.create_pool", new=AsyncMock(return_value=pool)) as create_pool, \
-             patch("main.asyncio.create_task", side_effect=fake_create_task) as create_task:
+        with (
+            patch("main.TARGET_CHANNEL", "test_channel"),
+            patch("main.create_pool", new=AsyncMock(return_value=pool)) as create_pool,
+            patch("main.asyncio.create_task", side_effect=fake_create_task) as create_task,
+        ):
             await bot.on_ready(ready_event)
 
         self.assertEqual(ready_event.chat.joined_rooms, ["test_channel"])
@@ -83,9 +85,11 @@ class WorminatorTests(unittest.IsolatedAsyncioTestCase):
         bot.pool = pool
         bot.db_worker_task = task
 
-        with patch("main.TARGET_CHANNEL", "test_channel"), \
-             patch("main.create_pool", new=AsyncMock()) as create_pool, \
-             patch("main.asyncio.create_task") as create_task:
+        with (
+            patch("main.TARGET_CHANNEL", "test_channel"),
+            patch("main.create_pool", new=AsyncMock()) as create_pool,
+            patch("main.asyncio.create_task") as create_task,
+        ):
             await bot.on_ready(ready_event)
 
         self.assertEqual(ready_event.chat.joined_rooms, ["test_channel"])

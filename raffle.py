@@ -1,24 +1,18 @@
-from twitchAPI.chat import Chat, EventData, ChatMessage, ChatSub, ChatCommand
-from twitchAPI.type import AuthScope, ChatEvent
-from twitchAPI.oauth import UserAuthenticator
-from twitchAPI.twitch import Twitch
-
 import asyncio
-import csv
-import random
 import os
+import random
 import time
-from dotenv import load_dotenv
-from typing import TYPE_CHECKING
-
-from utils import get_twitch_user_id
 
 import asyncpg
+from dotenv import load_dotenv
+from twitchAPI.chat import ChatCommand
 
 import postgres
+from utils import get_twitch_user_id
 
 load_dotenv()
 SUPERADMIN_ID = int(os.getenv("TWITCHSUPERADMINID", "0"))
+
 
 class Raffle:
     def __init__(self, duration=180, ticket_amt=1):
@@ -27,9 +21,9 @@ class Raffle:
         self.open = False
         self.end_timestamp = None
         self.users = {
-            "Entries" : {}, #user_id: username
-            "Claims" : {}, #user_id: username 
-            "Redrawn" : {}, #user_id: username
+            "Entries": {},  # user_id: username
+            "Claims": {},  # user_id: username
+            "Redrawn": {},  # user_id: username
         }
         self.tickets = {}
         self.task = None
@@ -46,11 +40,7 @@ class Raffle:
             "entries": len(self.users["Entries"]),
             "claims": len(self.users["Claims"]),
             "end_timestamp": self.end_timestamp,
-            "winner": (
-                {"id": winner_id, "username": winner_name}
-                if self.current_winner
-                else None
-            ),
+            "winner": ({"id": winner_id, "username": winner_name} if self.current_winner else None),
         }
 
     async def emit_overlay_state(self):
@@ -76,7 +66,10 @@ class Raffle:
         self.open = True
         self.end_timestamp = time.time() + self.duration
         print(f"[Raffle] Raffle started. Duration: {self.duration}s | Ticket award: {self.ticket_amt}")
-        await send_message(f"New Coaching raffle has been opened for {self.duration} seconds. !enter in Twitch Chat to enter. !claim to claim a ticket.")
+        await send_message(
+            f"New Coaching raffle has been opened for {self.duration} seconds. "
+            "!enter in Twitch Chat to enter. !claim to claim a ticket."
+        )
         self.task = asyncio.create_task(self._run_timer(send_message, pool))
         await self.emit_overlay_state()
 
@@ -95,7 +88,10 @@ class Raffle:
         winner_id, winner_name = await self.draw(pool)
         self.current_winner = (winner_id, winner_name)
         print(f"[Raffle] Winner drawn: {winner_name} (ID: {winner_id})")
-        await send_message(f"Congratulations {winner_name}, you have been selected for coaching! Use !resolve to confirm or !redraw to pick again.")
+        await send_message(
+            f"Congratulations {winner_name}, you have been selected for coaching! "
+            "Use !resolve to confirm or !redraw to pick again."
+        )
         await self.emit_overlay_state()
 
     async def enter(self, user_id: int, username: str, send_message):
@@ -107,7 +103,7 @@ class Raffle:
             print(f"[Raffle] {username} tried to enter but is already in the raffle.")
             await send_message(f"{username}, you have already entered the raffle!")
             return
-    
+
         if user_id in self.bot.winners:
             print(f"[Raffle] {username} tried to enter but has already won a raffle this session.")
             await send_message(f"{username}, you have already WON a raffle this session, please !claim instead!")
@@ -152,7 +148,7 @@ class Raffle:
         weights = [self.tickets.get(user_id, 1) for user_id, _ in entries]
 
         return random.choices(entries, weights=weights, k=1)[0]
-    
+
     async def redraw(self, send_message, pool: asyncpg.Pool):
         if not self.current_winner:
             print("[Raffle] Redraw attempted but there is no current winner.")
@@ -183,7 +179,7 @@ class Raffle:
         if self.task:
             self.task.cancel()
         print("[Raffle] Raffle has been cancelled.")
-        
+
     def extend(self, additional_seconds=60):
         if self.task:
             self.task.cancel()
@@ -196,26 +192,20 @@ class Raffle:
     async def load_tickets(self, pool: asyncpg.Pool):
         self.tickets = await postgres.get_all_tickets(pool) or {}
         print(f"[Raffle] Loaded tickets for {len(self.tickets)} users from database.")
- 
+
     async def resolve(self, send_message):
         if not self.current_winner:
             everyone = (
-                list(self.users["Entries"].items()) +
-                list(self.users["Claims"].items()) +
-                list(self.users["Redrawn"].items())
+                list(self.users["Entries"].items())
+                + list(self.users["Claims"].items())
+                + list(self.users["Redrawn"].items())
             )
             if not everyone:
                 await send_message("No active winner and no entries. No tickets issued.")
                 return
-            
+
             print(f"[Raffle] No winner. Awarding tickets to all {len(everyone)} participants.")
-            await self.bot.queue_db(
-                postgres.resolve_raffle_tickets,
-                self.pool,
-                None,
-                everyone,
-                self.ticket_amt
-            )
+            await self.bot.queue_db(postgres.resolve_raffle_tickets, self.pool, None, everyone, self.ticket_amt)
             await send_message("No winner, tickets awarded to all participants.")
             self.open = False
             self.end_timestamp = None
@@ -224,21 +214,11 @@ class Raffle:
 
         winner_id, winner_name = self.current_winner
 
-        losers = [
-            (uid, uname)
-            for uid, uname in self.users["Entries"].items()
-            if uid != winner_id
-        ]
+        losers = [(uid, uname) for uid, uname in self.users["Entries"].items() if uid != winner_id]
 
-        redrawn = [
-            (uid, uname)
-            for uid, uname in self.users["Redrawn"].items()
-       ]
+        redrawn = [(uid, uname) for uid, uname in self.users["Redrawn"].items()]
 
-        claimers = [
-            (uid, uname)
-            for uid, uname in self.users["Claims"].items()
-        ]
+        claimers = [(uid, uname) for uid, uname in self.users["Claims"].items()]
         print(f"losers list: {losers}")
         print(f"redrawn list: {redrawn}")
         print(f"claimers list: {claimers}")
@@ -248,11 +228,15 @@ class Raffle:
             self.pool,
             (winner_id, winner_name),
             losers + claimers + redrawn,
-            self.ticket_amt
+            self.ticket_amt,
         )
-        
+
         self.bot.winners.append(winner_id)
-        print(f"[Raffle] Resolved. Winner: {winner_name} | Losers awarded tickets: {len(losers)} | Claimers awarded tickets: {len(claimers)}")
+        print(
+            f"[Raffle] Resolved. Winner: {winner_name} "
+            f"| Losers awarded tickets: {len(losers)} "
+            f"| Claimers awarded tickets: {len(claimers)}"
+        )
 
         self.open = False
         self.end_timestamp = None
@@ -266,6 +250,7 @@ raffle: Raffle | None = None
 def user_is_superadmin(cmd: ChatCommand) -> bool:
     return int(cmd.user.id) == SUPERADMIN_ID
 
+
 def make_commands(bot):
 
     async def new_raffle_command(cmd: ChatCommand):
@@ -273,7 +258,10 @@ def make_commands(bot):
         if not user_is_superadmin(cmd):
             return
         if raffle:
-            print(f"[Command] !newraffle called by {cmd.user.name} but previous raffle not resolved. Run !resolve before starting new raffle.")
+            print(
+                f"[Command] !newraffle called by {cmd.user.name} but previous raffle not resolved. "
+                "Run !resolve before starting new raffle."
+            )
             await cmd.reply("Please resolve the current raffle first!")
             return
         duration = cmd.parameter.strip()
@@ -360,7 +348,7 @@ def make_commands(bot):
         await raffle.resolve(cmd.reply)
         await cmd.reply("The current raffle has been resolved!")
         raffle = None
-        
+
     async def enter_command(cmd: ChatCommand):
         if not raffle or not raffle.open:
             await cmd.reply("There is no raffle open right now!")
@@ -376,20 +364,20 @@ def make_commands(bot):
 
     async def add_ticket_command(cmd: ChatCommand):
         """
-        Register addticket command in twitch. Takes username and a ticket amount. 
-        If ticket amount is unspecified, it adds 1 ticket to the specified user.. 
+        Register addticket command in twitch. Takes username and a ticket amount.
+        If ticket amount is unspecified, it adds 1 ticket to the specified user..
         """
         if not user_is_superadmin(cmd):
             return
         print(f"[Command] !addticket called by {cmd.user.name}.")
 
         parts = cmd.parameter.strip().split()
-        
+
         # if addticket called with no username or ticket_amt or 3+ parameters, return error
         if len(parts) < 1 or len(parts) > 2:
             await cmd.reply("Usage: !addticket <USERNAME> [ticket_amt|1]")
             return
-        
+
         # if it is [username, ticket_amt] but ticket_amt not a digit, return error
         if len(parts) == 2 and not parts[1].isdigit():
             await cmd.reply("Usage: !addticket <USERNAME> [ticket_amt|1]")
@@ -405,12 +393,7 @@ def make_commands(bot):
             await cmd.reply(f"Could not find Twitch user: {username}")
             return
 
-        await bot.queue_db(
-            postgres.update_user_tickets,
-            bot.pool,
-            [(twitch_id, username)],
-            credit_amount
-        )
+        await bot.queue_db(postgres.update_user_tickets, bot.pool, [(twitch_id, username)], credit_amount)
 
         print(f"[Command] !addticket called by {cmd.user.name}. Crediting {credit_amount} tickets to {username}.")
         await cmd.reply(f"Added {credit_amount} ticket(s) to {username}!")
@@ -421,11 +404,7 @@ def make_commands(bot):
             await cmd.reply("Could not resolve your Twitch account.")
             return
 
-        ticket_amt = await bot.queue_db(
-            postgres.get_user_tickets,
-            bot.pool,
-            twitch_id
-        )
+        ticket_amt = await bot.queue_db(postgres.get_user_tickets, bot.pool, twitch_id)
         await cmd.reply(f"{cmd.user.name}, you have {ticket_amt} ticket(s).")
 
     return {

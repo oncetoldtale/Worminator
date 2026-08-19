@@ -1,9 +1,11 @@
 import asyncio
 import json
 import os
+
 from aiohttp import web
 
 WEBSOCKET_DISABLED = os.getenv("WORMINATOR_WS_DISABLED", "").strip().lower() == "true"
+
 
 class OverlayBroadcaster:
     def __init__(self, host="127.0.0.1", port=8765):
@@ -30,7 +32,7 @@ class OverlayBroadcaster:
         await ws.prepare(request)
 
         self.clients.add(ws)
-        print(f"[OVERLAY] Client connected.")
+        print("[OVERLAY] Client connected.")
 
         try:
             await ws.send_json({"type": "raffle_state", "state": await self.get_state()})
@@ -38,7 +40,7 @@ class OverlayBroadcaster:
                 pass
         finally:
             self.clients.discard(ws)
-            print(f"[OVERLAY] Client disconnected.")
+            print("[OVERLAY] Client disconnected.")
 
         return ws
 
@@ -67,7 +69,7 @@ class OverlayBroadcaster:
     async def stop(self):
         for ws in list(self.clients):
             await ws.close()
-            print(f"[OVERLAY] Websocket server closed.")
+            print("[OVERLAY] Websocket server closed.")
         self.clients.clear()
 
         if self.runner:
@@ -81,7 +83,7 @@ class OverlayBroadcaster:
             snapshot = dict(self.state)
 
         await self.broadcast({"type": "raffle_state", "state": snapshot})
-        print(f"[OVERLAY] Pushing new raffle state to overlay.")  # might remove if too spammy
+        print("[OVERLAY] Pushing new raffle state to overlay.")  # might remove if too spammy
 
     async def get_state(self):
         async with self.state_lock:

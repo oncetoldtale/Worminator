@@ -1,13 +1,11 @@
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from tests.support.dependency_stubs import install_test_environment
+import postgres
 from tests.support.db_fakes import FakeConnection, FakePool
-
+from tests.support.dependency_stubs import install_test_environment
 
 install_test_environment()
-
-import postgres
 
 
 class PostgresTests(unittest.IsolatedAsyncioTestCase):
