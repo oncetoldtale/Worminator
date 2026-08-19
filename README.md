@@ -2,7 +2,9 @@
 
 Worminator is a stream companion application for [OnceToldTale](https://twitch.tv/oncetoldtale).
 
-It handles Twitch integration, raffle management, persistent user data, and a real-time browser overlay system for OBS. It is designed as a modular backend where different platforms and interfaces can interact with shared application features.
+It handles Twitch integration, raffle management, persistent user data, and a real-time browser overlay system for OBS.
+It is designed as a modular backend where different platforms and interfaces can interact with shared application
+features.
 
 ## Table of Contents
 
@@ -24,7 +26,7 @@ It handles Twitch integration, raffle management, persistent user data, and a re
 Clone the repository:
 
 ```bash
-git clone https://github.com/simsonas86/Worminator.git
+git clone https://github.com/oncetoldtale/Worminator.git
 cd Worminator
 ```
 
@@ -48,7 +50,8 @@ Create a `.env` file in project root following `.env.example`
 
 ## Contributing<a id="contributing"></a>
 
-Contributions are very appreciated. Before starting work on a new feature, check on discord to make sure it's not already in the works by someone else.
+Contributions are very appreciated. Before starting work on a new feature, check on discord to make sure it's not
+already in the works by someone else.
 
 ## License<a id="license"></a>
 
